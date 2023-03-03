@@ -22,7 +22,7 @@ bool Connection::connect(std::string ip, unsigned short port,
 bool Connection::update(std::string sql){
 	// insert、delete、update
 	if (mysql_query(_conn, sql.c_str()))
-	{
+	{	
 		LOG("update failed:" + sql);
 		return false;
 	}

@@ -19,6 +19,7 @@ ConnectionPool::ConnectionPool() {
 	//create initSize connection
 	//no need to consider thread safe problem here
 	//as programe just boot up, no other threads going into this area
+
 	for (int i = 0; i < _initSize; i++) {
 		Connection* p = new Connection();
 		p->connect(_ip, _port, _username, _password, _dbname);
@@ -37,9 +38,9 @@ ConnectionPool::ConnectionPool() {
 	produce.detach();
 	// create a thread to loop the connectionQueue to check the idle connection
 	// if exceed the max idle time, break it
-	//thread scanner(std::bind(&ConnectionPool::scanConnectionTask, this));
+	thread scanner(std::bind(&ConnectionPool::scanConnectionTask, this));
 	//let it run in background, deamon thread
-	//scanner.detach();
+	scanner.detach();
 }	
 
 bool ConnectionPool::loadConfigFile() {
@@ -78,7 +79,7 @@ bool ConnectionPool::loadConfigFile() {
 		else if (key == "password") {
 			_password = value;
 		}
-		else if (key == "iniSize") {
+		else if (key == "initSize") {
 			_initSize = atoi(value.c_str());
 		}
 		else if (key == "maxSize") {
@@ -89,6 +90,9 @@ bool ConnectionPool::loadConfigFile() {
 		}
 		else if (key == "dbname") {
 			_dbname = value;
+		}
+		else if (key == "maxIdleTime") {
+			_maxIdleTime = atoi(value.c_str());
 		}
 	}
 	return 1;
@@ -138,17 +142,16 @@ shared_ptr<Connection> ConnectionPool::getConnection() {
 	};
 	shared_ptr<Connection> sp(_connectionQueue.front(), reload_shared_ptr_deleter);
 	_connectionQueue.pop();
-	//tell produce that i used a connection, production thread is going to check the queue, if empty, produce
+	//tell producer that i used a connection, production thread is going to check the queue, if empty, produce
 	_cond_v.notify_all();
 
 	return sp;
 }
-
+#include<windows.h>  
 void ConnectionPool::scanConnectionTask() {
 	for (;;) {
 		// use sleep to simulate timing
 		this_thread::sleep_for(chrono::seconds(_maxIdleTime));
-
 		//scan connectionQueue, release unnessery connections
 		unique_lock<mutex> lock(_queueMutex);
 		//if _connectionCnt > initSize which means we created additional connection, we release them

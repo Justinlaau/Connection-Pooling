@@ -6,7 +6,7 @@
 int main()
 {
     clock_t start = clock();
-    /*
+/*
     for (int i = 0; i < 1000; i++) {
         Connection conn;
         char sql[1024] = { 0 };
@@ -15,14 +15,13 @@ int main()
         conn.connect("127.0.0.1", 3306, "root", "1111", "user");
         conn.update(sql);
     }
-    */
-
+*/
     for (int i = 0; i < 1000; i++) {
         ConnectionPool* cp = ConnectionPool::getConnectionPool();
         shared_ptr<Connection> sp =  cp->getConnection();
         char sql[1024] = { 0 };
-        sprintf_s(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
-            "zustin" + char(i), i, "male");
+        sprintf(sql, "insert into user(name, age, sex) values('%s', '%d', '%s')",
+           to_string(i).c_str(), i, "male");
         sp->update(sql);
     }
     clock_t end = clock();
