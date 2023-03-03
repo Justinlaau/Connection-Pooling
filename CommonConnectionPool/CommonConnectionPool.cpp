@@ -1,5 +1,6 @@
 #include "CommonConnectionPool.h"
 #include "pch.h"
+#include "public.h"
 
 ConnectionPool* ConnectionPool::getConnectionPool() {
 /*thread safe lazy loading singleton mode, the whole programe only has one instance
@@ -36,9 +37,9 @@ ConnectionPool::ConnectionPool() {
 	produce.detach();
 	// create a thread to loop the connectionQueue to check the idle connection
 	// if exceed the max idle time, break it
-	thread scanner(std::bind(&ConnectionPool::scanConnectionTask, this));
+	//thread scanner(std::bind(&ConnectionPool::scanConnectionTask, this));
 	//let it run in background, deamon thread
-	scanner.detach();
+	//scanner.detach();
 }	
 
 bool ConnectionPool::loadConfigFile() {
@@ -103,16 +104,14 @@ void ConnectionPool::produceConnectionTask() {
 
 		if (_connectionCnt < _maxSize) {
 			Connection* p = new Connection();
-			if (!p->connect(_ip, _port, _username, _password, _dbname)) {
-				LOG("connection failed !");
-			}
+			p->connect(_ip, _port, _username, _password, _dbname);
 			p->refreshAliveTime();
 			_connectionQueue.push(p);
 			_connectionCnt++;
 		}
 		//tell consumer, connection avaliable
 		_cond_v.notify_all();
-	};
+	}
 }
 
 shared_ptr<Connection> ConnectionPool::getConnection() {
@@ -126,9 +125,10 @@ shared_ptr<Connection> ConnectionPool::getConnection() {
 				LOG("Connection timeout....cannot connect");
 				return nullptr;
 			}
-
+			
 		}
 	}
+
 	auto reload_shared_ptr_deleter = [&](Connection* pcon) {
 		//would be called in server application threads, need to condsider thread safety 
 		unique_lock<mutex> lock(_queueMutex);
@@ -156,7 +156,7 @@ void ConnectionPool::scanConnectionTask() {
 		while (_connectionCnt > _initSize) {
 			Connection* p = _connectionQueue.front();
 			//if alivetime > maxIdleTime, which means the programme doesnt use this connection for a while
-			if (p->getAliveTime() >= _maxIdleTime * 1000) {
+			if (p->getAliveTime() >= (_maxIdleTime * 1000)) {
 				_connectionQueue.pop();
 				_connectionCnt--;
 				delete p;

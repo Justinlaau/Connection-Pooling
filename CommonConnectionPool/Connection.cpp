@@ -7,8 +7,7 @@ Connection::Connection(){
 
 Connection::~Connection(){
 	// release connection resources
-	if (_conn != nullptr)
-		mysql_close(_conn);
+	if (_conn != nullptr)mysql_close(_conn);
 }
 
 bool Connection::connect(std::string ip, unsigned short port, 

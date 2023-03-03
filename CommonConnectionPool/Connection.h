@@ -30,10 +30,11 @@ public:
 
 	//refresh idle time of a connection
 	void refreshAliveTime() { _alive_time = clock(); }
+
 	//return alive time
-	clock_t getAliveTime() const { return clock() - _alive_time; }
+	clock_t getAliveTime() { return clock() - _alive_time; }
 private:
 	MYSQL* _conn; // one connection to MySQL server
 	// counting the idle time (when the connection is in the queue)
-	clock_t _alive_time;
+	clock_t _alive_time=clock();
 };
