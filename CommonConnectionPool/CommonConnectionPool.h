@@ -25,8 +25,14 @@ public:
 	//stupid, use shared_ptr, and overload its destructor to help take back the resource
 	shared_ptr<Connection> getConnection();
 
+//thread functions
+private:
 	//independent thread that responsible for producing new connection
 	void produceConnectionTask();
+	
+	//scan the Queue
+	void scanConnectionTask();
+
 private:
 	
 	//load the config file

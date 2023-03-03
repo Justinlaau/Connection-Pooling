@@ -21,6 +21,8 @@ ConnectionPool::ConnectionPool() {
 	for (int i = 0; i < _initSize; i++) {
 		Connection* p = new Connection();
 		p->connect(_ip, _port, _username, _password, _dbname);
+		//store the current time point
+		p->refreshAliveTime();
 		_connectionQueue.push(p);
 		_connectionCnt++;
 	}
@@ -30,6 +32,13 @@ ConnectionPool::ConnectionPool() {
 	// i used to write a out class function and receive a object to do so
 	// but this is way more convient to access the data and smart
 	thread produce(std::bind(&ConnectionPool::produceConnectionTask, this));
+	//let it run in background, deamon thread
+	produce.detach();
+	// create a thread to loop the connectionQueue to check the idle connection
+	// if exceed the max idle time, break it
+	thread scanner(std::bind(&ConnectionPool::scanConnectionTask, this));
+	//let it run in background, deamon thread
+	scanner.detach();
 }	
 
 bool ConnectionPool::loadConfigFile() {
@@ -97,6 +106,7 @@ void ConnectionPool::produceConnectionTask() {
 			if (!p->connect(_ip, _port, _username, _password, _dbname)) {
 				LOG("connection failed !");
 			}
+			p->refreshAliveTime();
 			_connectionQueue.push(p);
 			_connectionCnt++;
 		}
@@ -122,7 +132,9 @@ shared_ptr<Connection> ConnectionPool::getConnection() {
 	auto reload_shared_ptr_deleter = [&](Connection* pcon) {
 		//would be called in server application threads, need to condsider thread safety 
 		unique_lock<mutex> lock(_queueMutex);
+		pcon->refreshAliveTime();
 		_connectionQueue.push(pcon);
+
 	};
 	shared_ptr<Connection> sp(_connectionQueue.front(), reload_shared_ptr_deleter);
 	_connectionQueue.pop();
@@ -130,4 +142,29 @@ shared_ptr<Connection> ConnectionPool::getConnection() {
 	_cond_v.notify_all();
 
 	return sp;
+}
+
+void ConnectionPool::scanConnectionTask() {
+	for (;;) {
+		// use sleep to simulate timing
+		this_thread::sleep_for(chrono::seconds(_maxIdleTime));
+
+		//scan connectionQueue, release unnessery connections
+		unique_lock<mutex> lock(_queueMutex);
+		//if _connectionCnt > initSize which means we created additional connection, we release them
+		//keep the _initSize of connections in the Pool
+		while (_connectionCnt > _initSize) {
+			Connection* p = _connectionQueue.front();
+			//if alivetime > maxIdleTime, which means the programme doesnt use this connection for a while
+			if (p->getAliveTime() >= _maxIdleTime * 1000) {
+				_connectionQueue.pop();
+				_connectionCnt--;
+				delete p;
+			}
+			else {
+				//Queue is FIFO, if the first one didnt exceed the time, later one is impossible so
+				break;
+			}
+		}
+	}
 }
